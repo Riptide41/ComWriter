@@ -27,13 +27,13 @@ class MainWindow(QMainWindow):
         self.ui.cmb_port.signal_hidden_popup.connect(self.start_stop_detect)
         self.ui.cmb_port.signal_show_popup.connect(self.start_stop_detect)
         self.timer_redetect.timeout.connect(self.serial_port_detect)
-        # self.ui.btn_connect_port.connect(self.open_close_port)
+        # self.ui.btn_open_close_port.connect(self.open_close_port)
 
     def open_close_port(self):
         t = threading.Thread(target=self.open_close_port_process)
         t.setDaemon(True)
         t.start()
-
+    #
     # def open_close_port_process(self):
     #     try:
     #         if self.com.is_open:
