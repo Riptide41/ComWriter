@@ -5,7 +5,7 @@ import libscrc,time
 # Ascii字符串转换为16进制字符串，每个字用空格隔开
 def asciiB2HexString(strB):
     strHex = binascii.b2a_hex(strB).upper()
-    print(strHex)
+    # print(strHex)
     return re.sub(r"(?<=\w)(?=(?:\w\w)+$)", " ", strHex.decode()) + " "
 
 
@@ -29,12 +29,14 @@ def hexStringB2Hex(hexString):
 
 
 class Emuart(object):
+    ask_info = '[Are you an emuart??]'
     def __init__(self, com):
         self.have_ue_flag = False
         self.frame_head = 'a5 06'
         self.frame_tail = 'b6 07'
         self.com = com
 
+    # 连接设备
     def connect_device(self):
         ret = 0
         self.com.baudrate = 115200
@@ -45,17 +47,13 @@ class Emuart(object):
         self.com.open()
         ret += 1
         print("open success")
-        data = '[Are you an emuart??]'
-        self.com.write(self.emuart_frame(data))
+        self.com.write(self.emuart_frame(self.ask_info))
         time.sleep(0.1)
         length = max(1, min(2048, self.com.in_waiting))
-        bytes = self.com.read(length)
-        if bytes != None:
-            self.emuart_unframe(bytes)
-            print(re.search(b"\xa5\x06.*\xb6\x07", bytes))
-            print(struct.unpack(">H", bytes[-4:-2]))
-            print(bytes[-4:-2])
-            print(bytes)
+        read_bytes = self.com.read(length)
+        if read_bytes is not None:
+            ret = self.emuart_unframe(read_bytes)
+            print(ret)
 
         # if
         #     # self.receiveProcess = threading.Thread(target=self.receiveData)
@@ -67,19 +65,26 @@ class Emuart(object):
         #     print(e)
         #     # self.errorSignal.emit( parameters.strOpenFailed +"\n"+ str(e))
         #     # self.setDisableSettingsSignal.emit(False)
-    def emuart_unframe(self, data):
-        re.search(b"\xa5\x06.*\xb6\x07", bytes)
+
+    # 解帧
+    def emuart_unframe(self, bytes):
+        datas = re.findall(b"\xa5\x06(.*)\xb6\x07", bytes)
+        for data in datas:
+            re_crc = struct.unpack(">H", bytes[-4:-2])
+            data = data[2:-2]
+            if re_crc[0] != libscrc.modbus(data):
+                return 0
+            return data
+            pass
 
     # 组帧
     def emuart_frame(self, data):
         data = asciiB2HexString(data.encode())
         data = hexStringB2Hex(data)
-        crc_res = libscrc.modbus('[Are you an emuart??]'.encode())
+        crc_res = libscrc.modbus(self.ask_info.encode())
         frame = hexStringB2Hex(self.frame_head) + struct.pack('>H', len(data)) + data + \
                 struct.pack('>H', crc_res) + hexStringB2Hex(self.frame_tail)
         return frame
 
-    def shake_hand(self):
-        shake_info = b"a5 06 00 15 5b 41 72 65 20 79 6F 75 20 61 6e 20 65 6d 75 61 72 74 3f 3f 5d 61 34 b6 07"
 
     pass
