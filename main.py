@@ -4,6 +4,7 @@ import sys
 import threading
 import serial
 import serial.tools.list_ports
+import emuart
 
 import time
 from PyQt5.QtWidgets import QApplication, QMainWindow
@@ -14,6 +15,7 @@ class MainWindow(QMainWindow):
     receive_progress_stop_flag = True
     ui = Mainwindow_Ui.Ui_MainWindow()
     com = serial.Serial()
+    setDisableSettingsSignal = QtCore.pyqtSignal(bool)
 
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
@@ -27,18 +29,78 @@ class MainWindow(QMainWindow):
         self.ui.cmb_port.signal_hidden_popup.connect(self.start_stop_detect)
         self.ui.cmb_port.signal_show_popup.connect(self.start_stop_detect)
         self.timer_redetect.timeout.connect(self.serial_port_detect)
-        # self.ui.btn_open_close_port.connect(self.open_close_port)
+        self.ui.btn_open_close_port.clicked.connect(self.open_close_port)
+        self.setDisableSettingsSignal.connect(self.disable_setting)
+
+    def disable_setting(self, disable):
+        if disable:
+            self.ui.btn_open_close_port.setText("关闭串口")
+            # self.statusBarStauts.setText("<font color=%s>%s</font>" % ("#008200", parameters.strReady))
+            self.ui.cmb_port.setDisabled(True)
+            # self.serailBaudrateCombobox.setDisabled(True)
+            # self.serailParityCombobox.setDisabled(True)
+            # self.serailStopbitsCombobox.setDisabled(True)
+            # self.serailBytesCombobox.setDisabled(True)
+            # self.ui.btn_open_close_port.setDisabled(False)
+        else:
+            self.ui.btn_open_close_port.setText("开启串口")
+            # self.statusBarStauts.setText("<font color=%s>%s</font>" % ("#f31414", parameters.strClosed))
+            self.ui.cmb_port.setDisabled(False)
+            # self.serailBaudrateCombobox.setDisabled(False)
+            # self.serailParityCombobox.setDisabled(False)
+            # self.serailStopbitsCombobox.setDisabled(False)
+            # self.serailBytesCombobox.setDisabled(False)
+            # self.programExitSaveParameters()
 
     def open_close_port(self):
+        # self.open_close_port()
         t = threading.Thread(target=self.open_close_port_process)
         t.setDaemon(True)
         t.start()
-    #
-    # def open_close_port_process(self):
-    #     try:
-    #         if self.com.is_open:
-    #             self.receive_progress_stop_flag = True
-    #             self.com.close()
+
+    def open_close_port_process(self):
+        if self.com.is_open:
+            self.com.close()
+        self.com.port = self.ui.cmb_port.currentText().split(" ")[0]
+        self.emuart = emuart.Emuart(self.com)
+
+        self.setDisableSettingsSignal.emit(True)
+        self.receive_progress_stop_flag = True
+        ret = self.emuart.connect_device()
+        self.setDisableSettingsSignal.emit(False)
+        self.receive_progress_stop_flag = False
+
+        # try:
+        #     if self.com.is_open:
+        #         self.receive_progress_stop_flag = True
+        #         self.com.close()
+        #         self.setDisableSettingsSignal.emit(False)
+        #     else:
+        #         try:
+        #             self.com.baudrate = 115200
+        #             self.com.port = self.ui.cmb_port.currentText().split(" ")[0]
+        #             self.com.bytesize = 8
+        #             self.com.parity = 'N'
+        #             self.com.stopbits = 1
+        #             self.com.timeout = None
+        #             self.com.open()
+        #             print("open success")
+        #             data = '[Are you an emuart??]'
+        #             a= emuart.Emuart('a')
+        #             self.com.write(a.emuart_frame(data))
+        #             self.setDisableSettingsSignal.emit(True)
+        #             # self.receiveProcess = threading.Thread(target=self.receiveData)
+        #             # self.receiveProcess.setDaemon(True)
+        #             # self.receiveProcess.start()
+        #         except Exception as e:
+        #             self.com.close()
+        #             self.receiveProgressStop = True
+        #             print(e)
+        #             # self.errorSignal.emit( parameters.strOpenFailed +"\n"+ str(e))
+        #             # self.setDisableSettingsSignal.emit(False)
+        # except Exception as e:
+        #     print(e)
+
 
     def start_stop_detect(self, flag):
         if flag:
