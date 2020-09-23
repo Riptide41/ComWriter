@@ -7,7 +7,7 @@ import serial.tools.list_ports
 import emuart
 
 import time
-from PyQt5.QtWidgets import QApplication, QMainWindow
+from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QErrorMessage
 
 
 class MainWindow(QMainWindow):
@@ -16,6 +16,7 @@ class MainWindow(QMainWindow):
     ui = Mainwindow_Ui.Ui_MainWindow()
     com = serial.Serial()
     setDisableSettingsSignal = QtCore.pyqtSignal(bool)
+    show_error_message_signal = QtCore.pyqtSignal(int)
 
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
@@ -31,6 +32,7 @@ class MainWindow(QMainWindow):
         self.timer_redetect.timeout.connect(self.serial_port_detect)
         self.ui.btn_open_close_port.clicked.connect(self.open_close_port)
         self.setDisableSettingsSignal.connect(self.disable_setting)
+        self.show_error_message_signal.connect(self.connect_serial_failed_message)
 
     def disable_setting(self, disable):
         if disable:
@@ -53,22 +55,45 @@ class MainWindow(QMainWindow):
             # self.programExitSaveParameters()
 
     def open_close_port(self):
-        # self.open_close_port()
+        # self.open_close_port_process()
+
         t = threading.Thread(target=self.open_close_port_process)
         t.setDaemon(True)
         t.start()
 
+    def connect_serial_failed_message(self, errortype):
+        print(errortype)
+        if errortype is 1:
+            self.ui.label_connect_info.setText("打开串口失败！")
+            QMessageBox.critical(self, "打开失败", "打开串口失败，没有找到USB串口，可能原因如下：\r\n"
+                                               "（1）USB串口未插上PC\r\n（2）PC未安装串口驱动\r\n（3）串口被其他程序占用\r\n.")
+        elif errortype is 2:
+            self.ui.label_connect_info.setText("握手失败！")
+            QMessageBox.critical(self, "握手失败", "打开串口成功，但未连接终端。可能原因如下：\r\n"
+                                               "（1）USB串口驱动需更新\r\n（2）USB串口未连接终端\r\n（3）终端程序未运行\r\n。")
+        elif errortype is 3:
+            self.ui.label_connect_info.setText("连接失败！")
+            QMessageBox.critical(self, "连接失败", "发现设备，但连接失败！")
+
+
     def open_close_port_process(self):
         if self.com.is_open:
             self.com.close()
-        self.com.port = self.ui.cmb_port.currentText().split(" ")[0]
-        self.emuart = emuart.Emuart(self.com)
-
-        self.setDisableSettingsSignal.emit(True)
-        self.receive_progress_stop_flag = True
-        ret = self.emuart.connect_device()
-        self.setDisableSettingsSignal.emit(False)
-        self.receive_progress_stop_flag = False
+            self.setDisableSettingsSignal.emit(False)
+            self.receive_progress_stop_flag = False
+        else:
+            self.com.port = self.ui.cmb_port.currentText().split(" ")[0]
+            self.emuart = emuart.Emuart(self.com)
+            self.setDisableSettingsSignal.emit(True)
+            self.receive_progress_stop_flag = True
+            ret, self.device_info = self.emuart.connect_device()
+            if ret:
+                self.show_error_message_signal.emit(ret)
+                self.setDisableSettingsSignal.emit(False)
+                # self.receive_progress_stop_flag = False
+            else:
+                self.ui.label_connect_info.setText(self.com.name+":"+self.device_info.mcu_type+" "+self.device_info.bios_version)
+                print("探测成功")
 
         # try:
         #     if self.com.is_open:
@@ -101,7 +126,6 @@ class MainWindow(QMainWindow):
         # except Exception as e:
         #     print(e)
 
-
     def start_stop_detect(self, flag):
         if flag:
             if not self.timer_redetect.isActive():
@@ -110,6 +134,7 @@ class MainWindow(QMainWindow):
             self.timer_redetect.stop()
 
     def serial_port_detect(self):
+        # self.detect_serial_port_process()
         if not self.detecting_port_flag:
             t = threading.Thread(target=self.detect_serial_port_process)
             t.setDaemon(True)
@@ -130,7 +155,6 @@ class MainWindow(QMainWindow):
                 if index >= 0:
                     self.ui.cmb_port.setCurrentIndex(index)
                 else:
-
                     self.ui.cmb_port.setCurrentIndex(0)
                 break
             time.sleep(1)

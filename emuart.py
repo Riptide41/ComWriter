@@ -1,5 +1,6 @@
 import struct, re, binascii
-import libscrc,time
+import libscrc, time
+import serial
 
 
 # Ascii字符串转换为16进制字符串，每个字用空格隔开
@@ -24,36 +25,91 @@ def hexStringB2Hex(hexString):
         data = bytes.fromhex(data)
     except Exception:
         return -1
-    # print(data)
     return data
+
+# 存放采集到的串口信息
+class device_info(object):
+    def __init__(self, bytes):
+        self.uecom_type = bytes[0:24].decode("ascii")
+        self.mcu_type = bytes[25:45].decode("ascii")
+        self.U_Start_Ads = struct.unpack("<I", bytes[45:49])[0]
+        self.U_code_size = struct.unpack("<I", bytes[49:53])[0]
+        self.replace_num = struct.unpack("<I", bytes[53:57])[0]
+        self.reserve_num = struct.unpack("<I", bytes[57:61])[0]
+        self.bios_version = bytes[61:69].decode("ascii")
 
 
 class Emuart(object):
     ask_info = '[Are you an emuart??]'
+    shake_info = "\nshake"
+    frame_head = 'a5 06'
+    frame_tail = 'b6 07'
+    terminate_info = 'StOpUeMySeLf'
+    update_info = '\vupdate'
+
     def __init__(self, com):
         self.have_ue_flag = False
-        self.frame_head = 'a5 06'
-        self.frame_tail = 'b6 07'
         self.com = com
+
+    def send_and_receive(self, data, wait_time=500, cnt=1):
+        if not self.com.is_open or len(data) == 0:
+            return False
+        if wait_time is 0:
+            self.com.write(self.emuart_frame(data))
+            return
+        while cnt is not 0:
+            print(self.emuart_frame(data))
+            self.com.write(self.emuart_frame(data))
+            try_time = 0
+            while try_time != wait_time / 20:
+                time.sleep(0.02)
+                if self.com.in_waiting:
+                    length = max(1, min(2048, self.com.in_waiting))
+                    read_bytes = self.com.read(length)
+                    print(read_bytes)
+                    if read_bytes is not None:
+                        print(self.emuart_unframe(read_bytes))
+                        return self.emuart_unframe(read_bytes)
+                try_time += 1
+            cnt -= 1
+        return False
 
     # 连接设备
     def connect_device(self):
-        ret = 0
-        self.com.baudrate = 115200
-        self.com.bytesize = 8
-        self.com.parity = 'N'
-        self.com.stopbits = 1
-        self.com.timeout = None
-        self.com.open()
-        ret += 1
-        print("open success")
-        self.com.write(self.emuart_frame(self.ask_info))
-        time.sleep(0.1)
-        length = max(1, min(2048, self.com.in_waiting))
-        read_bytes = self.com.read(length)
-        if read_bytes is not None:
-            ret = self.emuart_unframe(read_bytes)
-            print(ret)
+        try:
+            self.com.baudrate = 115200
+            self.com.bytesize = 8
+            self.com.parity = 'N'
+            self.com.stopbits = 1
+            self.com.timeout = None
+            self.com.open()
+            print("open success")
+            # self.com.write(self.emuart_frame(self.ask_info))
+        except Exception as e:
+            self.com.close()
+            return 2, None  # 返回2打开串口失败
+        res = self.send_and_receive(self.ask_info, 500, 1)
+        if res != b"[Yes,I am an emuart!!]":
+            self.com.close()
+            return 1, None  # 返回1打开串口成功但未接收程序
+        else:
+            res = self.send_and_receive(self.shake_info, 100, 3)  # 成功识别
+            if res:
+                try:
+                    self.device_info = device_info(res)
+                except Exception as e:
+                    return 3, None
+                return 0, self.device_info
+            else:
+                return 3, None
+        # time.sleep(0.1)
+        # if self.com.in_waiting:
+        #     length = max(1, min(2048, self.com.in_waiting))
+        #     read_bytes = self.com.read(length)
+        #     if read_bytes is not None:
+        #         res = self.emuart_unframe(read_bytes)
+        #         if res == "[Yes,I am an emuart!!]":
+        #             return 0  # 握手成功
 
         # if
         #     # self.receiveProcess = threading.Thread(target=self.receiveData)
@@ -68,6 +124,7 @@ class Emuart(object):
 
     # 解帧
     def emuart_unframe(self, bytes):
+        # print("sss", bytes)
         datas = re.findall(b"\xa5\x06(.*)\xb6\x07", bytes)
         for data in datas:
             re_crc = struct.unpack(">H", bytes[-4:-2])
@@ -79,12 +136,11 @@ class Emuart(object):
 
     # 组帧
     def emuart_frame(self, data):
+        crc_res = libscrc.modbus(data.encode())
         data = asciiB2HexString(data.encode())
         data = hexStringB2Hex(data)
-        crc_res = libscrc.modbus(self.ask_info.encode())
         frame = hexStringB2Hex(self.frame_head) + struct.pack('>H', len(data)) + data + \
                 struct.pack('>H', crc_res) + hexStringB2Hex(self.frame_tail)
         return frame
-
 
     pass
