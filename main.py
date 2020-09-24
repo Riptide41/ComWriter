@@ -5,9 +5,10 @@ import threading
 import serial
 import serial.tools.list_ports
 import emuart
+import parsehex
 
 import time
-from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QErrorMessage
+from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog
 
 
 class MainWindow(QMainWindow):
@@ -17,6 +18,8 @@ class MainWindow(QMainWindow):
     com = serial.Serial()
     setDisableSettingsSignal = QtCore.pyqtSignal(bool)
     show_error_message_signal = QtCore.pyqtSignal(int)
+    read_file_error_signal = QtCore.pyqtSignal(int)
+    display_hex_signal = QtCore.pyqtSignal()
 
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
@@ -33,6 +36,47 @@ class MainWindow(QMainWindow):
         self.ui.btn_open_close_port.clicked.connect(self.open_close_port)
         self.setDisableSettingsSignal.connect(self.disable_setting)
         self.show_error_message_signal.connect(self.connect_serial_failed_message)
+        self.ui.btn_select_file.clicked.connect(self.select_file)
+        self.ui.btn_open_file.clicked.connect(self.open_hex_file)
+        self.read_file_error_signal.connect(self.open_file_error_meesage)
+        self.display_hex_signal.connect(self.display_hex)
+
+    def select_file(self):
+        file_path = QFileDialog.getOpenFileName(self, "选择文件", "", "Hex Files(*.hex)")
+        print(file_path)
+        self.ui.le_file_path.setText(file_path[0])
+
+    def open_hex_file(self):
+        t = threading.Thread(target=self.open_hex_file_process)
+        t.setDaemon(True)
+        t.start()
+
+    def display_hex(self):
+        self.ui.tb_hex_file.document().clear()
+        t = threading.Thread(target=self.display_hex_process,args=(self.ui.tb_hex_file, self.hex.hex_string))
+        t.start()
+
+    # def slot1(self):
+    #     def _slot1(textBrowser, hex_string):
+    #         for line in hex_string:
+    #             textBrowser.append(line)  # 文本框逐条添加数据
+    #             textBrowser.moveCursor(textBrowser.textCursor().End)  # 文本框显示到底部
+    #             time.sleep(0.2)
+    #     threading.Thread(target=_slot1, args=(self.ui.tb_hex_file, self.hex.hex_string)).start()
+    def display_hex_process(self, tb, lines):
+
+        # tb.document().clear()
+        for line in lines:
+            tb.append(line)
+            time.sleep(0.001)
+        pass
+
+    def open_hex_file_process(self):
+        file_path = self.ui.le_file_path.text()
+        self.hex = parsehex.Hex()
+        if self.hex.load_file(file_path):
+            self.read_file_error_signal.emit(1)
+        self.display_hex_signal.emit()
 
     def disable_setting(self, disable):
         if disable:
@@ -56,10 +100,13 @@ class MainWindow(QMainWindow):
 
     def open_close_port(self):
         # self.open_close_port_process()
-
         t = threading.Thread(target=self.open_close_port_process)
         t.setDaemon(True)
         t.start()
+
+    def open_file_error_meesage(self,errortype):
+        if errortype is 1:
+            QMessageBox.critical(self, "打开失败", "打开文件失败！\r\n")
 
     def connect_serial_failed_message(self, errortype):
         print(errortype)
