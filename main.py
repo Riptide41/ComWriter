@@ -72,17 +72,17 @@ class MainWindow(QMainWindow):
             return 2
         updater = update.Update(self.hex.hex_dicts)
         try:
-            self.ui.tb_update_info.appendPlainText("运行状态：整体更新开始\r\n")
+            self.ui.tb_update_info.insertPlainText("运行状态：整体更新开始\r\n")
             index, send_data = updater.get_next_index_frame()
-            print("first frame", send_data)
             while send_data is not None:
                 if index != updater.frame_sum - 1:
                     print("send_data:", send_data)
                     datd = self.emuart.send_and_receive(send_data)
                     if datd != None:
                         print(datd)
-                        self.ui.tb_update_info.insertPlainText(str(datd) + "\r\n")
                         self.ui.tb_update_info.moveCursor(QTextCursor.End)
+                        self.ui.tb_update_info.insertPlainText(str(datd) + "\r\n")
+                        # self.ui.tb_update_info.moveCursor(QTextCursor.End)
                         index, send_data = updater.get_next_index_frame()
                         time.sleep(0.2)
                     else:
@@ -100,8 +100,8 @@ class MainWindow(QMainWindow):
 
     def display_hex_process(self, tb, lines):
         for line in lines:  # 显示需要在子线程，否则主线程卡死，并且需要延时，否则刷太快有bug
-            tb.append(line)
-            time.sleep(0.001)
+            tb.insertPlainText(line)
+            time.sleep(0.005)
         pass
 
     def open_hex_file_process(self):

@@ -66,8 +66,8 @@ class Emuart(object):
             self.com.flushInput()
             self.com.write(self.emuart_frame(data))
             try_time = 0
-            while try_time != wait_time / 20:
-                time.sleep(0.01)
+            while try_time != wait_time / 4:
+                time.sleep(0.05)
                 if self.com.in_waiting:
                     length = max(1, min(2048, self.com.in_waiting))
                     read_bytes = self.com.read(length)
@@ -78,30 +78,6 @@ class Emuart(object):
                 try_time += 1
             cnt -= 1
         return False
-
-    # 发送bytes数据，并接收返回数据
-    # def send_bytes_and_receive(self, data, wait_time=500, cnt=1):
-    #     if not self.com.is_open or len(data) == 0:
-    #         return False
-    #     if wait_time is 0:
-    #         self.com.write(self.emuart_bytes_frame(data))
-    #         return
-    #     while cnt is not 0:
-    #         print(self.emuart_bytes_frame(data))
-    #         self.com.write(self.emuart_bytes_frame(data))
-    #         try_time = 0
-    #         while try_time != wait_time / 20:
-    #             time.sleep(0.02)
-    #             if self.com.in_waiting:
-    #                 length = max(1, min(2048, self.com.in_waiting))
-    #                 read_bytes = self.com.read(length)
-    #                 print("recev:", read_bytes)
-    #                 if read_bytes is not None:
-    #                     print("unframe:", self.emuart_unframe(read_bytes))
-    #                     return self.emuart_unframe(read_bytes)
-    #             try_time += 1
-    #         cnt -= 1
-    #     return False
 
     # 连接设备
     def connect_device(self):

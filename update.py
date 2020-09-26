@@ -93,11 +93,10 @@ class Update(object):
         # else:
         #     return index, self.frame_data[index]
         if self.index < len(self.check):
-
             print(self.index, len(self.frame_data))
             print(self.frame_data[self.index])
             self.index += 1
             return self.index-1, self.frame_data[self.index-1]
-        return None
+        return None, None
 
 
