@@ -27,8 +27,9 @@ def hexStringB2Hex(hexString):
         return -1
     return data
 
+
 # 存放采集到的串口信息
-class device_info(object):
+class DeviceInfo(object):
     def __init__(self, bytes):
         self.uecom_type = bytes[0:24].decode("ascii")
         self.mcu_type = bytes[25:45].decode("ascii")
@@ -51,28 +52,56 @@ class Emuart(object):
         self.have_ue_flag = False
         self.com = com
 
+    # 组帧发送字符串并接收返回数据
     def send_and_receive(self, data, wait_time=500, cnt=1):
         if not self.com.is_open or len(data) == 0:
             return False
+        if not isinstance(data, bytes):
+            data = data.encode()
         if wait_time is 0:
             self.com.write(self.emuart_frame(data))
             return
         while cnt is not 0:
             print(self.emuart_frame(data))
+            self.com.flushInput()
             self.com.write(self.emuart_frame(data))
             try_time = 0
             while try_time != wait_time / 20:
-                time.sleep(0.02)
+                time.sleep(0.01)
                 if self.com.in_waiting:
                     length = max(1, min(2048, self.com.in_waiting))
                     read_bytes = self.com.read(length)
-                    print(read_bytes)
+                    print("recev:", read_bytes)
                     if read_bytes is not None:
-                        print(self.emuart_unframe(read_bytes))
+                        print("unframe:", self.emuart_unframe(read_bytes))
                         return self.emuart_unframe(read_bytes)
                 try_time += 1
             cnt -= 1
         return False
+
+    # 发送bytes数据，并接收返回数据
+    # def send_bytes_and_receive(self, data, wait_time=500, cnt=1):
+    #     if not self.com.is_open or len(data) == 0:
+    #         return False
+    #     if wait_time is 0:
+    #         self.com.write(self.emuart_bytes_frame(data))
+    #         return
+    #     while cnt is not 0:
+    #         print(self.emuart_bytes_frame(data))
+    #         self.com.write(self.emuart_bytes_frame(data))
+    #         try_time = 0
+    #         while try_time != wait_time / 20:
+    #             time.sleep(0.02)
+    #             if self.com.in_waiting:
+    #                 length = max(1, min(2048, self.com.in_waiting))
+    #                 read_bytes = self.com.read(length)
+    #                 print("recev:", read_bytes)
+    #                 if read_bytes is not None:
+    #                     print("unframe:", self.emuart_unframe(read_bytes))
+    #                     return self.emuart_unframe(read_bytes)
+    #             try_time += 1
+    #         cnt -= 1
+    #     return False
 
     # 连接设备
     def connect_device(self):
@@ -96,7 +125,7 @@ class Emuart(object):
             res = self.send_and_receive(self.shake_info, 100, 3)  # 成功识别
             if res:
                 try:
-                    self.device_info = device_info(res)
+                    self.device_info = DeviceInfo(res)
                 except Exception as e:
                     return 3, None
                 return 0, self.device_info
@@ -125,21 +154,23 @@ class Emuart(object):
     # 解帧
     def emuart_unframe(self, bytes):
         # print("sss", bytes)
-        datas = re.findall(b"\xa5\x06(.*)\xb6\x07", bytes)
+        datas = re.findall(b"\xa5\x06([\s\S]*)\xb6\x07", bytes)
         for data in datas:
             re_crc = struct.unpack(">H", bytes[-4:-2])
             data = data[2:-2]
+            print(data)
+            print("crc", re_crc)
             if re_crc[0] != libscrc.modbus(data):
                 return 0
+
             return data
             pass
 
     # 组帧
-    def emuart_frame(self, data):
-        crc_res = libscrc.modbus(data.encode())
-        data = asciiB2HexString(data.encode())
-        data = hexStringB2Hex(data)
-        frame = hexStringB2Hex(self.frame_head) + struct.pack('>H', len(data)) + data + \
+
+    def emuart_frame(self, bytes):
+        crc_res = libscrc.modbus(bytes)
+        frame = hexStringB2Hex(self.frame_head) + struct.pack('>H', len(bytes)) + bytes + \
                 struct.pack('>H', crc_res) + hexStringB2Hex(self.frame_tail)
         return frame
 

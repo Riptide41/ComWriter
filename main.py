@@ -5,10 +5,11 @@ import threading
 import serial
 import serial.tools.list_ports
 import emuart
-import parsehex
+import parsehex, update
 
 import time
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog
+from PyQt5.QtGui import QTextCursor
 
 
 class MainWindow(QMainWindow):
@@ -40,6 +41,7 @@ class MainWindow(QMainWindow):
         self.ui.btn_open_file.clicked.connect(self.open_hex_file)
         self.read_file_error_signal.connect(self.open_file_error_meesage)
         self.display_hex_signal.connect(self.display_hex)
+        self.ui.btn_autoupdate.clicked.connect(self.auto_update)
 
     def select_file(self):
         file_path = QFileDialog.getOpenFileName(self, "选择文件", "", "Hex Files(*.hex)")
@@ -52,9 +54,41 @@ class MainWindow(QMainWindow):
         t.start()
 
     def display_hex(self):
-        self.ui.tb_hex_file.document().clear()
-        t = threading.Thread(target=self.display_hex_process,args=(self.ui.tb_hex_file, self.hex.hex_string))
+        self.ui.tb_hex_file.document().clear()  # 此句必须在主线程，否则出错
+        self.ui.btn_autoupdate.setEnabled(True)
+        t = threading.Thread(target=self.display_hex_process, args=(self.ui.tb_hex_file, self.hex.hex_string))
         t.start()
+
+    def auto_update(self):
+        t = threading.Thread(target=self.auto_update_process)
+        t.setDaemon(True)
+        t.start()
+
+    def auto_update_process(self):
+        self.ui.btn_autoupdate.setEnabled(False)
+        if len(self.hex.hex_dicts) == 0:
+            return 1
+        if not self.com.is_open:
+            return 2
+        updater = update.Update(self.hex.hex_dicts)
+        try:
+            self.ui.tb_update_info.appendPlainText("运行状态：整体更新开始\r\n")
+            index, send_data = updater.get_next_index_frame()
+            print("first frame", send_data)
+            while send_data is not None:
+                if index != updater.frame_sum - 1:
+                    print("send_data:", send_data)
+                    datd = self.emuart.send_and_receive(send_data)
+                    if datd != None:
+                        print(datd)
+                        self.ui.tb_update_info.insertPlainText(str(datd) + "\r\n")
+                        self.ui.tb_update_info.moveCursor(QTextCursor.End)
+                        index, send_data = updater.get_next_index_frame()
+                        time.sleep(0.2)
+                    else:
+                        return
+        finally:
+            pass
 
     # def slot1(self):
     #     def _slot1(textBrowser, hex_string):
@@ -63,10 +97,9 @@ class MainWindow(QMainWindow):
     #             textBrowser.moveCursor(textBrowser.textCursor().End)  # 文本框显示到底部
     #             time.sleep(0.2)
     #     threading.Thread(target=_slot1, args=(self.ui.tb_hex_file, self.hex.hex_string)).start()
-    def display_hex_process(self, tb, lines):
 
-        # tb.document().clear()
-        for line in lines:
+    def display_hex_process(self, tb, lines):
+        for line in lines:  # 显示需要在子线程，否则主线程卡死，并且需要延时，否则刷太快有bug
             tb.append(line)
             time.sleep(0.001)
         pass
@@ -104,7 +137,7 @@ class MainWindow(QMainWindow):
         t.setDaemon(True)
         t.start()
 
-    def open_file_error_meesage(self,errortype):
+    def open_file_error_meesage(self, errortype):
         if errortype is 1:
             QMessageBox.critical(self, "打开失败", "打开文件失败！\r\n")
 
@@ -122,7 +155,6 @@ class MainWindow(QMainWindow):
             self.ui.label_connect_info.setText("连接失败！")
             QMessageBox.critical(self, "连接失败", "发现设备，但连接失败！")
 
-
     def open_close_port_process(self):
         if self.com.is_open:
             self.com.close()
@@ -139,39 +171,9 @@ class MainWindow(QMainWindow):
                 self.setDisableSettingsSignal.emit(False)
                 # self.receive_progress_stop_flag = False
             else:
-                self.ui.label_connect_info.setText(self.com.name+":"+self.device_info.mcu_type+" "+self.device_info.bios_version)
+                self.ui.label_connect_info.setText(
+                    self.com.name + ":" + self.device_info.mcu_type + " " + self.device_info.bios_version)
                 print("探测成功")
-
-        # try:
-        #     if self.com.is_open:
-        #         self.receive_progress_stop_flag = True
-        #         self.com.close()
-        #         self.setDisableSettingsSignal.emit(False)
-        #     else:
-        #         try:
-        #             self.com.baudrate = 115200
-        #             self.com.port = self.ui.cmb_port.currentText().split(" ")[0]
-        #             self.com.bytesize = 8
-        #             self.com.parity = 'N'
-        #             self.com.stopbits = 1
-        #             self.com.timeout = None
-        #             self.com.open()
-        #             print("open success")
-        #             data = '[Are you an emuart??]'
-        #             a= emuart.Emuart('a')
-        #             self.com.write(a.emuart_frame(data))
-        #             self.setDisableSettingsSignal.emit(True)
-        #             # self.receiveProcess = threading.Thread(target=self.receiveData)
-        #             # self.receiveProcess.setDaemon(True)
-        #             # self.receiveProcess.start()
-        #         except Exception as e:
-        #             self.com.close()
-        #             self.receiveProgressStop = True
-        #             print(e)
-        #             # self.errorSignal.emit( parameters.strOpenFailed +"\n"+ str(e))
-        #             # self.setDisableSettingsSignal.emit(False)
-        # except Exception as e:
-        #     print(e)
 
     def start_stop_detect(self, flag):
         if flag:
