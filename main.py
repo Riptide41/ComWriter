@@ -1,15 +1,17 @@
-import Mainwindow_Ui
-from PyQt5 import QtCore
 import sys
 import threading
+import time
+
 import serial
 import serial.tools.list_ports
-import emuart
-import parsehex, update
-
-import time
-from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog
+from PyQt5 import QtCore
 from PyQt5.QtGui import QTextCursor
+from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog
+
+import Mainwindow_Ui
+import emuart
+import parsehex
+import update
 
 
 class MainWindow(QMainWindow):
@@ -21,6 +23,8 @@ class MainWindow(QMainWindow):
     show_error_message_signal = QtCore.pyqtSignal(int)
     read_file_error_signal = QtCore.pyqtSignal(int)
     display_hex_signal = QtCore.pyqtSignal()
+    progressbar_signal = QtCore.pyqtSignal(int)
+    is_read_file_flag = 0
 
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
@@ -36,28 +40,29 @@ class MainWindow(QMainWindow):
         self.timer_redetect.timeout.connect(self.serial_port_detect)
         self.ui.btn_open_close_port.clicked.connect(self.open_close_port)
         self.setDisableSettingsSignal.connect(self.disable_setting)
-        self.show_error_message_signal.connect(self.connect_serial_failed_message)
-        self.ui.btn_select_file.clicked.connect(self.select_file)
-        self.ui.btn_open_file.clicked.connect(self.open_hex_file)
+        self.show_error_message_signal.connect(self.failed_message)
+        self.ui.btn_select_file.clicked.connect(self.select_open_file)
         self.read_file_error_signal.connect(self.open_file_error_meesage)
         self.display_hex_signal.connect(self.display_hex)
         self.ui.btn_autoupdate.clicked.connect(self.auto_update)
+        self.progressbar_signal.connect(self.progressbar_increase)
 
-    def select_file(self):
+    def progressbar_increase(self, var):
+        self.ui.progressBar.setValue(var)
+
+    def select_open_file(self):
         file_path = QFileDialog.getOpenFileName(self, "选择文件", "", "Hex Files(*.hex)")
         print(file_path)
         self.ui.le_file_path.setText(file_path[0])
-
-    def open_hex_file(self):
         t = threading.Thread(target=self.open_hex_file_process)
         t.setDaemon(True)
         t.start()
 
     def display_hex(self):
         self.ui.tb_hex_file.document().clear()  # 此句必须在主线程，否则出错
-        self.ui.btn_autoupdate.setEnabled(True)
-        t = threading.Thread(target=self.display_hex_process, args=(self.ui.tb_hex_file, self.hex.hex_string))
-        t.start()
+        if len(self.hex.hex_string):
+            self.ui.tb_hex_file.setPlainText('\r\n'.join(self.hex.hex_string))
+            self.ui.btn_autoupdate.setEnabled(True)
 
     def auto_update(self):
         t = threading.Thread(target=self.auto_update_process)
@@ -65,74 +70,74 @@ class MainWindow(QMainWindow):
         t.start()
 
     def auto_update_process(self):
+        if not self.is_read_file_flag:
+            self.show_error_message_signal.emit(6)
+            return
         self.ui.btn_autoupdate.setEnabled(False)
         if len(self.hex.hex_dicts) == 0:
             return 1
         if not self.com.is_open:
+            self.show_error_message_signal.emit(1)
             return 2
         updater = update.Update(self.hex.hex_dicts)
         try:
+            self.ui.tb_update_info.moveCursor(QTextCursor.End)
             self.ui.tb_update_info.insertPlainText("运行状态：整体更新开始\r\n")
             index, send_data = updater.get_next_index_frame()
+            count = 0
             while send_data is not None:
                 if index != updater.frame_sum - 1:
                     print("send_data:", send_data)
-                    datd = self.emuart.send_and_receive(send_data)
-                    if datd != None:
-                        print(datd)
+                    back_bytes = self.emuart.send_and_receive(send_data)
+                    if back_bytes is not None:
+                        flag, num, status = updater.back_bytes_parse(back_bytes)  # 返回flag为0则成功
+                        if flag:
+                            raise ValueError
                         self.ui.tb_update_info.moveCursor(QTextCursor.End)
-                        self.ui.tb_update_info.insertPlainText(str(datd) + "\r\n")
-                        # self.ui.tb_update_info.moveCursor(QTextCursor.End)
+                        self.ui.tb_update_info.insertPlainText(f"当前第{num + 1}/{updater.frame_sum}帧" + "\r\n")
+                        # if index - count >= 10:
+                        self.progressbar_signal.emit(index * 100 / updater.frame_sum)
+                        # count = index
                         index, send_data = updater.get_next_index_frame()
-                        time.sleep(0.2)
+                        time.sleep(0.05)
                     else:
+                        self.ui.btn_autoupdate.setEnabled(True)
                         return
+                else:
+                    self.emuart.send_and_receive(send_data, wait_time=0)
+                    self.ui.tb_update_info.moveCursor(QTextCursor.End)
+                    self.ui.tb_update_info.insertPlainText(f"当前第{updater.frame_sum}/{updater.frame_sum}帧" + "\r\n"
+                                                           + "更新完成！！！" + "\r\n")    # 打印更新成功标志
+                    self.progressbar_signal.emit(100)
+                    break
+        except Exception as e:
+            print(e)
+            self.show_error_message_signal.emit(4)
         finally:
-            pass
-
-    # def slot1(self):
-    #     def _slot1(textBrowser, hex_string):
-    #         for line in hex_string:
-    #             textBrowser.append(line)  # 文本框逐条添加数据
-    #             textBrowser.moveCursor(textBrowser.textCursor().End)  # 文本框显示到底部
-    #             time.sleep(0.2)
-    #     threading.Thread(target=_slot1, args=(self.ui.tb_hex_file, self.hex.hex_string)).start()
-
-    def display_hex_process(self, tb, lines):
-        for line in lines:  # 显示需要在子线程，否则主线程卡死，并且需要延时，否则刷太快有bug
-            tb.insertPlainText(line)
-            time.sleep(0.005)
-        pass
+            self.ui.btn_autoupdate.setEnabled(True)
 
     def open_hex_file_process(self):
         file_path = self.ui.le_file_path.text()
         self.hex = parsehex.Hex()
-        if self.hex.load_file(file_path):
-            self.read_file_error_signal.emit(1)
-        self.display_hex_signal.emit()
+        if file_path == "":
+            self.is_read_file_flag = 0
+        else:
+            if self.hex.load_file(file_path):
+                self.read_file_error_signal.emit(1)
+        self.is_read_file_flag = 1
+        self.display_hex_signal.emit()  # 主线程更改ui,否则可能出错
 
     def disable_setting(self, disable):
         if disable:
-            self.ui.btn_open_close_port.setText("关闭串口")
-            # self.statusBarStauts.setText("<font color=%s>%s</font>" % ("#008200", parameters.strReady))
+            self.ui.btn_open_close_port.setText("断开设备")
             self.ui.cmb_port.setDisabled(True)
-            # self.serailBaudrateCombobox.setDisabled(True)
-            # self.serailParityCombobox.setDisabled(True)
-            # self.serailStopbitsCombobox.setDisabled(True)
-            # self.serailBytesCombobox.setDisabled(True)
-            # self.ui.btn_open_close_port.setDisabled(False)
+            self.ui.btn_autoupdate.setDisabled(False)
         else:
-            self.ui.btn_open_close_port.setText("开启串口")
-            # self.statusBarStauts.setText("<font color=%s>%s</font>" % ("#f31414", parameters.strClosed))
+            self.ui.btn_open_close_port.setText("连接设备")
             self.ui.cmb_port.setDisabled(False)
-            # self.serailBaudrateCombobox.setDisabled(False)
-            # self.serailParityCombobox.setDisabled(False)
-            # self.serailStopbitsCombobox.setDisabled(False)
-            # self.serailBytesCombobox.setDisabled(False)
-            # self.programExitSaveParameters()
+            self.ui.btn_autoupdate.setDisabled(True)
 
     def open_close_port(self):
-        # self.open_close_port_process()
         t = threading.Thread(target=self.open_close_port_process)
         t.setDaemon(True)
         t.start()
@@ -141,7 +146,7 @@ class MainWindow(QMainWindow):
         if errortype is 1:
             QMessageBox.critical(self, "打开失败", "打开文件失败！\r\n")
 
-    def connect_serial_failed_message(self, errortype):
+    def failed_message(self, errortype):
         print(errortype)
         if errortype is 1:
             self.ui.label_connect_info.setText("打开串口失败！")
@@ -154,6 +159,12 @@ class MainWindow(QMainWindow):
         elif errortype is 3:
             self.ui.label_connect_info.setText("连接失败！")
             QMessageBox.critical(self, "连接失败", "发现设备，但连接失败！")
+        elif errortype is 4:
+            self.ui.label_connect_info.setText("写入失败！")
+            QMessageBox.critical(self, "写入失败", "写入失败，请重试。")
+        elif errortype is 6:
+            self.ui.label_connect_info.setText("未打开hex文件！")
+            QMessageBox.critical(self, "未打开hex文件", "请先打开hex文件。")
 
     def open_close_port_process(self):
         if self.com.is_open:
@@ -183,7 +194,6 @@ class MainWindow(QMainWindow):
             self.timer_redetect.stop()
 
     def serial_port_detect(self):
-        # self.detect_serial_port_process()
         if not self.detecting_port_flag:
             t = threading.Thread(target=self.detect_serial_port_process)
             t.setDaemon(True)

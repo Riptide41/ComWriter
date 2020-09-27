@@ -1,6 +1,9 @@
-import struct, re, binascii
-import libscrc, time
-import serial
+import binascii
+import re
+import struct
+
+import libscrc
+import time
 
 
 # Ascii字符串转换为16进制字符串，每个字用空格隔开
@@ -52,7 +55,7 @@ class Emuart(object):
         self.have_ue_flag = False
         self.com = com
 
-    # 组帧发送字符串并接收返回数据
+    # 组帧发送字符串并接收返回数据进行解帧返回
     def send_and_receive(self, data, wait_time=500, cnt=1):
         if not self.com.is_open or len(data) == 0:
             return False
@@ -71,9 +74,9 @@ class Emuart(object):
                 if self.com.in_waiting:
                     length = max(1, min(2048, self.com.in_waiting))
                     read_bytes = self.com.read(length)
-                    print("recev:", read_bytes)
+                    # print("receive:", read_bytes)
                     if read_bytes is not None:
-                        print("unframe:", self.emuart_unframe(read_bytes))
+                        # print("unframe:", self.emuart_unframe(read_bytes))
                         return self.emuart_unframe(read_bytes)
                 try_time += 1
             cnt -= 1
@@ -95,41 +98,24 @@ class Emuart(object):
             return 2, None  # 返回2打开串口失败
         res = self.send_and_receive(self.ask_info, 500, 1)
         if res != b"[Yes,I am an emuart!!]":
+            self.com.write(self.terminate_info.encode())    # 终结下位机组帧状态
             self.com.close()
             return 1, None  # 返回1打开串口成功但未接收程序
         else:
-            res = self.send_and_receive(self.shake_info, 100, 3)  # 成功识别
+            res = self.send_and_receive(self.shake_info, 100, 3)  # 成功识别，发送握手帧
             if res:
                 try:
                     self.device_info = DeviceInfo(res)
                 except Exception as e:
+                    print(e)
                     return 3, None
-                return 0, self.device_info
+                return 0, self.device_info    # 握手成功，返回设备信息
             else:
+                print("error:",res)
                 return 3, None
-        # time.sleep(0.1)
-        # if self.com.in_waiting:
-        #     length = max(1, min(2048, self.com.in_waiting))
-        #     read_bytes = self.com.read(length)
-        #     if read_bytes is not None:
-        #         res = self.emuart_unframe(read_bytes)
-        #         if res == "[Yes,I am an emuart!!]":
-        #             return 0  # 握手成功
-
-        # if
-        #     # self.receiveProcess = threading.Thread(target=self.receiveData)
-        #     # self.receiveProcess.setDaemon(True)
-        #     # self.receiveProcess.start()
-        # except Exception as e:
-        #     self.com.close()
-        #     self.receiveProgressStop = True
-        #     print(e)
-        #     # self.errorSignal.emit( parameters.strOpenFailed +"\n"+ str(e))
-        #     # self.setDisableSettingsSignal.emit(False)
 
     # 解帧
     def emuart_unframe(self, bytes):
-        # print("sss", bytes)
         datas = re.findall(b"\xa5\x06([\s\S]*)\xb6\x07", bytes)
         for data in datas:
             re_crc = struct.unpack(">H", bytes[-4:-2])

@@ -1,12 +1,10 @@
 # insert_data包含帧类型，分块数，每块起始地址列表，每块长度列表，数据字符串
 # 为什么叫插入帧我也不知道，应该是有其他类型帧的功能还没有实现
 class Update(object):
-    update_frame = []  # 成员为insert_data字典
-    check = []  # 存放写入帧的情况
-
-    index = 0
-
     def __init__(self, dicts):
+        self.update_frame = []
+        self.check = []
+        self.index = 0
         self.dicts = dicts
         self.generate_update_frame()  # 生成升级帧列表
         self.generate_return_data()
@@ -83,20 +81,35 @@ class Update(object):
             self.frame_data.append(data)
 
     def get_next_index_frame(self):
-        # index = self.check.index(0)
-        # if index >= len(self.check) - 1:
-        #     if index == len(self.check) - 1:  # 下一帧为更新命令帧时无需返回
-        #         self.check[index] = 1
-        #         return self.frame_data[index]
-        #     else:
-        #         return None    # 全部发送结束返回None
-        # else:
-        #     return index, self.frame_data[index]
-        if self.index < len(self.check):
-            print(self.index, len(self.frame_data))
-            print(self.frame_data[self.index])
-            self.index += 1
-            return self.index-1, self.frame_data[self.index-1]
-        return None, None
+        index = self.check.index(0)
+        if index >= len(self.check) - 1:
+            if index == len(self.check) - 1:  # 下一帧为更新命令帧时无需返回
+                self.check[index] = 1
+                return index, self.frame_data[index]
+            else:
+                return None    # 全部发送结束返回None
+        else:
+            return index, self.frame_data[index]
+        # if self.index < len(self.check):
+        #     print(self.index, len(self.frame_data))
+        #     print(self.frame_data[self.index])
+        #     self.index += 1
+        #     return self.index-1, self.frame_data[self.index-1]
+        # return None, None
+
+    def back_bytes_parse(self, bytes):
+        print("here")
+        if len(bytes) != 4 or bytes[0] != 5:
+            print(len(bytes), bytes[0])
+            return 2, 0, 0    # 接收到数据帧头不对
+        frame_num = int.from_bytes(bytes[1:3], byteorder='little')
+        status = int.from_bytes(bytes[3:4], byteorder='little')
+        if status in (0, 1, 2):
+            self.check[frame_num] = 1
+
+            return 0, frame_num, status    # 收到中断发送的标志位为3
+        return 1, frame_num, status
+
+
 
 

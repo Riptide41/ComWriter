@@ -20,9 +20,10 @@ def char2hex(line):
 
 
 class Hex(object):
-    hex_dicts = []
-    hex_string = []
-    addr_offset = 0
+    def __init__(self):
+        self.hex_dicts = []
+        self.hex_string = []
+        self.addr_offset = 0
 
     def load_file(self, file_path):
         file_name = os.path.basename(file_path)
