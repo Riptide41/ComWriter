@@ -5,7 +5,7 @@ import time
 import serial
 import serial.tools.list_ports
 from PyQt5 import QtCore
-from PyQt5.QtGui import QTextCursor
+from PyQt5.QtGui import QTextCursor, QIcon, QPixmap
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QFileDialog
 
 import Mainwindow_Ui
@@ -25,6 +25,7 @@ class MainWindow(QMainWindow):
     display_hex_signal = QtCore.pyqtSignal()
     progressbar_signal = QtCore.pyqtSignal(int)
     is_read_file_flag = 0
+    icon = QIcon()
 
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
@@ -33,6 +34,9 @@ class MainWindow(QMainWindow):
         self.start_stop_detect(True)  # 每1s重新检测串口一次
         self.init_event()
         self.serial_port_detect()
+        self.icon.addPixmap(QPixmap("./icon/icon.ico"), QIcon.Normal, QIcon.Off)
+        self.setWindowIcon(self.icon)
+
 
     def init_event(self):
         self.ui.cmb_port.signal_hidden_popup.connect(self.start_stop_detect)
@@ -46,17 +50,29 @@ class MainWindow(QMainWindow):
         self.display_hex_signal.connect(self.display_hex)
         self.ui.btn_autoupdate.clicked.connect(self.auto_update)
         self.progressbar_signal.connect(self.progressbar_increase)
+        self.ui.btn_exit.clicked.connect(self.close)
 
     def progressbar_increase(self, var):
         self.ui.progressBar.setValue(var)
 
     def select_open_file(self):
         file_path = QFileDialog.getOpenFileName(self, "选择文件", "", "Hex Files(*.hex)")
-        print(file_path)
+        # print(file_path)
         self.ui.le_file_path.setText(file_path[0])
         t = threading.Thread(target=self.open_hex_file_process)
         t.setDaemon(True)
         t.start()
+
+    def closeEvent(self, event):
+        reply = QMessageBox.question(self, '退出?',
+                                     "确定要退出吗?", QMessageBox.Yes |
+                                     QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            self.com.close()
+            self.receiveProgressStop = True
+            event.accept()
+        else:
+            event.ignore()
 
     def display_hex(self):
         self.ui.tb_hex_file.document().clear()  # 此句必须在主线程，否则出错
@@ -86,7 +102,7 @@ class MainWindow(QMainWindow):
             index, send_data = updater.get_next_index_frame()
             while send_data is not None:
                 if index != updater.frame_sum - 1:
-                    print("send_data:", send_data)
+                    # print("send_data:", send_data)
                     back_bytes = self.emuart.send_and_receive(send_data)
                     if back_bytes is not None:
                         flag, num, status = updater.back_bytes_parse(back_bytes)  # 返回flag为0则成功
@@ -96,7 +112,7 @@ class MainWindow(QMainWindow):
                         self.ui.tb_update_info.insertPlainText(f"当前第{num + 1}/{updater.frame_sum}帧" + "\r\n")
                         self.progressbar_signal.emit(index * 100 / updater.frame_sum)    # 更新进度条进度
                         index, send_data = updater.get_next_index_frame()
-                        time.sleep(0.05)
+                        time.sleep(0.001)
                     else:
                         self.ui.btn_autoupdate.setEnabled(True)
                         return
@@ -108,7 +124,7 @@ class MainWindow(QMainWindow):
                     self.progressbar_signal.emit(100)
                     break
         except Exception as e:
-            print(e)
+            # print(e)
             self.show_error_message_signal.emit(4)
         finally:
             self.ui.btn_autoupdate.setEnabled(True)
@@ -146,7 +162,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "打开失败", "打开文件失败！\r\n")
 
     def failed_message(self, errortype):
-        print(errortype)
+        # print(errortype)
         if errortype is 1:
             self.ui.label_connect_info.setText("打开串口失败！")
             QMessageBox.critical(self, "打开失败", "打开串口失败，没有找到USB串口，可能原因如下：\r\n"
@@ -183,7 +199,7 @@ class MainWindow(QMainWindow):
             else:
                 self.ui.label_connect_info.setText(
                     self.com.name + ":" + self.device_info.mcu_type + " " + self.device_info.bios_version)
-                print("探测成功")
+                # print("探测成功")
 
     def start_stop_detect(self, flag):
         if flag:
