@@ -84,7 +84,6 @@ class MainWindow(QMainWindow):
             self.ui.tb_update_info.moveCursor(QTextCursor.End)
             self.ui.tb_update_info.insertPlainText("运行状态：整体更新开始\r\n")
             index, send_data = updater.get_next_index_frame()
-            count = 0
             while send_data is not None:
                 if index != updater.frame_sum - 1:
                     print("send_data:", send_data)
@@ -95,9 +94,7 @@ class MainWindow(QMainWindow):
                             raise ValueError
                         self.ui.tb_update_info.moveCursor(QTextCursor.End)
                         self.ui.tb_update_info.insertPlainText(f"当前第{num + 1}/{updater.frame_sum}帧" + "\r\n")
-                        # if index - count >= 10:
-                        self.progressbar_signal.emit(index * 100 / updater.frame_sum)
-                        # count = index
+                        self.progressbar_signal.emit(index * 100 / updater.frame_sum)    # 更新进度条进度
                         index, send_data = updater.get_next_index_frame()
                         time.sleep(0.05)
                     else:
@@ -132,10 +129,12 @@ class MainWindow(QMainWindow):
             self.ui.btn_open_close_port.setText("断开设备")
             self.ui.cmb_port.setDisabled(True)
             self.ui.btn_autoupdate.setDisabled(False)
+            self.detecting_port_flag = False
         else:
             self.ui.btn_open_close_port.setText("连接设备")
             self.ui.cmb_port.setDisabled(False)
             self.ui.btn_autoupdate.setDisabled(True)
+            self.detecting_port_flag = True
 
     def open_close_port(self):
         t = threading.Thread(target=self.open_close_port_process)
