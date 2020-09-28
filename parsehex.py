@@ -43,11 +43,11 @@ class Hex(object):
     def add_dict(self, line):
         hex_dict = {}  # 初始化字典放置每行信息
         if line[0] != ":":
-            print(line[0])
+            # print(line[0])
             return 1
         hex_dict["data_len"] = int(line[1:3], 16)
         if len(line) != 2 * hex_dict["data_len"] + 11 or hex_dict["data_len"] == 0:
-            print(hex_dict["data_len"], len(line))
+            # print(hex_dict["data_len"], len(line))
             return 2  # 最后一行或数据长不匹配返回
         hex_dict["data_type"] = int(line[7:9], 16)
         if hex_dict["data_type"] not in (0, 1, 2, 4):

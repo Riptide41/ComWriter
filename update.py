@@ -39,7 +39,7 @@ class Update(object):
         code_size = self.dicts[-1]["data_addr"] + self.dicts[-1]["data_len"] - self.dicts[0]["data_addr"]
         self.frame_sum = len(self.update_frame) + 3  # 帧总数,除了insert_data 外还有1更新开始帧，1更新检查帧，1更新命令帧
         self.check = [0] * self.frame_sum
-        print(len(self.update_frame))
+        # print(len(self.update_frame))
         self.update_frame.insert(0, {"type": 0, "style": 0, "frame_num": self.frame_sum, "cur_num": 0, "code_size": code_size})
         self.update_frame.append({"type": 3, "cur_num": len(self.update_frame)})
         self.update_frame.append({"type": 4, "cur_num": len(self.update_frame)})
@@ -98,9 +98,9 @@ class Update(object):
         # return None, None
 
     def back_bytes_parse(self, bytes):
-        print("here")
+        # print("here")
         if len(bytes) != 4 or bytes[0] != 5:
-            print(len(bytes), bytes[0])
+            # print(len(bytes), bytes[0])
             return 2, 0, 0    # 接收到数据帧头不对
         frame_num = int.from_bytes(bytes[1:3], byteorder='little')
         status = int.from_bytes(bytes[3:4], byteorder='little')

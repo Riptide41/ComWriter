@@ -65,7 +65,7 @@ class Emuart(object):
             self.com.write(self.emuart_frame(data))
             return
         while cnt is not 0:
-            print(self.emuart_frame(data))
+            # print(self.emuart_frame(data))
             self.com.flushInput()
             self.com.write(self.emuart_frame(data))
             try_time = 0
@@ -91,7 +91,7 @@ class Emuart(object):
             self.com.stopbits = 1
             self.com.timeout = None
             self.com.open()
-            print("open success")
+            # print("open success")
             # self.com.write(self.emuart_frame(self.ask_info))
         except Exception as e:
             self.com.close()
@@ -107,11 +107,11 @@ class Emuart(object):
                 try:
                     self.device_info = DeviceInfo(res)
                 except Exception as e:
-                    print(e)
+                    # print(e)
                     return 3, None
                 return 0, self.device_info    # 握手成功，返回设备信息
             else:
-                print("error:",res)
+                # print("error:",res)
                 return 3, None
 
     # 解帧
@@ -120,8 +120,8 @@ class Emuart(object):
         for data in datas:
             re_crc = struct.unpack(">H", bytes[-4:-2])
             data = data[2:-2]
-            print(data)
-            print("crc", re_crc)
+            # print(data)
+            # print("crc", re_crc)
             if re_crc[0] != libscrc.modbus(data):
                 return 0
 
