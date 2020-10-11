@@ -37,7 +37,6 @@ class MainWindow(QMainWindow):
         self.icon.addPixmap(QPixmap("./icon/icon.ico"), QIcon.Normal, QIcon.Off)
         self.setWindowIcon(self.icon)
 
-
     def init_event(self):
         self.ui.cmb_port.signal_hidden_popup.connect(self.start_stop_detect)
         self.ui.cmb_port.signal_show_popup.connect(self.start_stop_detect)
@@ -110,7 +109,7 @@ class MainWindow(QMainWindow):
                             raise ValueError
                         self.ui.tb_update_info.moveCursor(QTextCursor.End)
                         self.ui.tb_update_info.insertPlainText(f"当前第{num + 1}/{updater.frame_sum}帧" + "\r\n")
-                        self.progressbar_signal.emit(index * 100 / updater.frame_sum)    # 更新进度条进度
+                        self.progressbar_signal.emit(index * 100 / updater.frame_sum)  # 更新进度条进度
                         index, send_data = updater.get_next_index_frame()
                         time.sleep(0.001)
                     else:
@@ -118,9 +117,10 @@ class MainWindow(QMainWindow):
                         return
                 else:
                     self.emuart.send_and_receive(send_data, wait_time=0)
-                    self.ui.tb_update_info.moveCursor(QTextCursor.End)
+
                     self.ui.tb_update_info.insertPlainText(f"当前第{updater.frame_sum}/{updater.frame_sum}帧" + "\r\n"
-                                                           + "更新完成！！！" + "\r\n")    # 打印更新成功标志
+                                                           + "更新完成！！！" + "\r\n")  # 打印更新成功标志
+                    self.ui.tb_update_info.moveCursor(QTextCursor.End)
                     self.progressbar_signal.emit(100)
                     break
         except Exception as e:
