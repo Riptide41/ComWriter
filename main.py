@@ -61,6 +61,7 @@ class MainWindow(QMainWindow):
         t = threading.Thread(target=self.open_hex_file_process)
         t.setDaemon(True)
         t.start()
+        # t.join()
 
     def closeEvent(self, event):
         reply = QMessageBox.question(self, '退出?',
@@ -80,9 +81,12 @@ class MainWindow(QMainWindow):
             self.ui.btn_autoupdate.setEnabled(True)
 
     def auto_update(self):
-        t = threading.Thread(target=self.auto_update_process)
-        t.setDaemon(True)
-        t.start()
+        try:
+            t = threading.Thread(target=self.auto_update_process)
+            t.setDaemon(True)
+            t.start()
+        except Exception as e:
+            print(e)
 
     def auto_update_process(self):
         if not self.is_read_file_flag:
@@ -120,13 +124,14 @@ class MainWindow(QMainWindow):
 
                     self.ui.tb_update_info.insertPlainText(f"当前第{updater.frame_sum}/{updater.frame_sum}帧" + "\r\n"
                                                            + "更新完成！！！" + "\r\n")  # 打印更新成功标志
-                    self.ui.tb_update_info.moveCursor(QTextCursor.End)
+
                     self.progressbar_signal.emit(100)
                     break
         except Exception as e:
             # print(e)
             self.show_error_message_signal.emit(4)
         finally:
+            self.ui.tb_update_info.moveCursor(QTextCursor.End)    # 不放这里会卡死
             self.ui.btn_autoupdate.setEnabled(True)
 
     def open_hex_file_process(self):
