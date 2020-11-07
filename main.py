@@ -24,6 +24,7 @@ class MainWindow(QMainWindow):
     read_file_error_signal = QtCore.pyqtSignal(int)
     display_hex_signal = QtCore.pyqtSignal()
     progressbar_signal = QtCore.pyqtSignal(int)
+    tb_update_info_flag = QtCore.pyqtSignal(str)
     is_read_file_flag = 0
     icon = QIcon()
 
@@ -49,6 +50,7 @@ class MainWindow(QMainWindow):
         self.ui.btn_autoupdate.clicked.connect(self.auto_update)
         self.progressbar_signal.connect(self.progressbar_increase)
         self.ui.btn_exit.clicked.connect(self.close)
+        self.tb_update_info_flag.connect(self.display_update_info)
 
     def progressbar_increase(self, var):
         self.ui.progressBar.setValue(var)
@@ -79,6 +81,10 @@ class MainWindow(QMainWindow):
             self.ui.tb_hex_file.setPlainText('\r\n'.join(self.hex.hex_string))
             self.ui.btn_autoupdate.setEnabled(True)
 
+    def display_update_info(self, string):
+        self.ui.tb_update_info.insertPlainText(string)
+        self.ui.tb_update_info.moveCursor(QTextCursor.End)
+
     def auto_update(self):
         try:
             t = threading.Thread(target=self.auto_update_process)
@@ -99,8 +105,7 @@ class MainWindow(QMainWindow):
             return 2
         updater = update.Update(self.hex.hex_dicts)
         try:
-            self.ui.tb_update_info.moveCursor(QTextCursor.End)
-            self.ui.tb_update_info.insertPlainText("运行状态：整体更新开始\r\n")
+            self.tb_update_info_flag.emit("运行状态：整体更新开始\r\n")
             index, send_data = updater.get_next_index_frame()
             while send_data is not None:
                 if index != updater.frame_sum - 1:
@@ -110,8 +115,7 @@ class MainWindow(QMainWindow):
                         flag, num, status = updater.back_bytes_parse(back_bytes)  # 返回flag为0则成功
                         if flag:
                             raise ValueError
-                        self.ui.tb_update_info.moveCursor(QTextCursor.End)
-                        self.ui.tb_update_info.insertPlainText(f"当前第{num + 1}/{updater.frame_sum}帧" + "\r\n")
+                        self.tb_update_info_flag.emit(f"当前第{num + 1}/{updater.frame_sum}帧" + "\r\n")
                         self.progressbar_signal.emit(index * 100 / updater.frame_sum)  # 更新进度条进度
                         index, send_data = updater.get_next_index_frame()
                         time.sleep(0.001)
@@ -121,8 +125,8 @@ class MainWindow(QMainWindow):
                 else:
                     self.emuart.send_and_receive(send_data, wait_time=0)
 
-                    self.ui.tb_update_info.insertPlainText(f"当前第{updater.frame_sum}/{updater.frame_sum}帧" + "\r\n"
-                                                           + "更新完成！！！" + "\r\n")  # 打印更新成功标志
+                    self.tb_update_info_flag.emit(f"当前第{updater.frame_sum}/{updater.frame_sum}帧" + "\r\n"
+                                                  + "更新完成！！！" + "\r\n")  # 打印更新成功标志
 
                     self.progressbar_signal.emit(100)
                     break
@@ -130,7 +134,6 @@ class MainWindow(QMainWindow):
             # print(e)
             self.show_error_message_signal.emit(4)
         finally:
-            self.ui.tb_update_info.moveCursor(QTextCursor.End)    # 不放这里会卡死
             self.ui.btn_autoupdate.setEnabled(True)
 
     def open_hex_file_process(self):
