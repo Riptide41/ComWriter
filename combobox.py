@@ -1,14 +1,28 @@
-from PyQt5 import QtWidgets, QtCore
+from PyQt5.QtWidgets import QComboBox, QListView
+from PyQt5.QtCore import pyqtSignal
 
 
-class Combobox(QtWidgets.QComboBox):
-    signal_show_popup = QtCore.pyqtSignal(bool)
-    signal_hidden_popup = QtCore.pyqtSignal()
+class ComboBox(QComboBox):
+    clicked = pyqtSignal()
+
+    # popupAboutToBeShown = pyqtSignal()
+
+    def __init__(self, parent=None):
+        QComboBox.__init__(self, parent)
+        listView = QListView()
+        self.setView(listView)
+        return
+
+    def mouseReleaseEvent(self, QMouseEvent):
+        self.showItems()
 
     def showPopup(self):
-        self.signal_show_popup.emit(False)
-        super(Combobox, self).showPopup()
+        # self.popupAboutToBeShown.emit()
+        # prevent show popup, manually call it in mouse release event
+        pass
 
-    def hidePopup(self):
-        self.signal_show_popup.emit(True)
-        super(Combobox, self).hidePopup()
+    def showItems(self):
+        super(ComboBox, self).showPopup()
+
+    def mousePressEvent(self, QMouseEvent):
+        self.clicked.emit()

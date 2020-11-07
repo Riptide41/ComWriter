@@ -30,17 +30,16 @@ class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
         self.ui.setupUi(self)
-        self.timer_redetect = QtCore.QTimer()
-        self.start_stop_detect(True)  # 每1s重新检测串口一次
+        # self.timer_redetect = QtCore.QTimer()
+        # self.start_stop_detect(True)  # 每1s重新检测串口一次
         self.init_event()
         self.serial_port_detect()
         self.icon.addPixmap(QPixmap("./icon/icon.ico"), QIcon.Normal, QIcon.Off)
         self.setWindowIcon(self.icon)
 
     def init_event(self):
-        self.ui.cmb_port.signal_hidden_popup.connect(self.start_stop_detect)
-        self.ui.cmb_port.signal_show_popup.connect(self.start_stop_detect)
-        self.timer_redetect.timeout.connect(self.serial_port_detect)
+        self.ui.cmb_port.clicked.connect(self.serial_port_detect)
+        # self.timer_redetect.timeout.connect(self.serial_port_detect)
         self.ui.btn_open_close_port.clicked.connect(self.open_close_port)
         self.setDisableSettingsSignal.connect(self.disable_setting)
         self.show_error_message_signal.connect(self.failed_message)
@@ -206,12 +205,12 @@ class MainWindow(QMainWindow):
                     self.com.name + ":" + self.device_info.mcu_type + " " + self.device_info.bios_version)
                 # print("探测成功")
 
-    def start_stop_detect(self, flag):
-        if flag:
-            if not self.timer_redetect.isActive():
-                self.timer_redetect.start(30)
-        elif self.timer_redetect.isActive():
-            self.timer_redetect.stop()
+    # def start_stop_detect(self, flag):
+    #     if flag:
+    #         if not self.timer_redetect.isActive():
+    #             self.timer_redetect.start(30)
+    #     elif self.timer_redetect.isActive():
+    #         self.timer_redetect.stop()
 
     def serial_port_detect(self):
         if not self.detecting_port_flag:

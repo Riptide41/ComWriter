@@ -54,7 +54,7 @@ class Ui_MainWindow(object):
         self.horizontalLayout_4.setContentsMargins(2, 2, 2, 2)
         self.horizontalLayout_4.setSpacing(16)
         self.horizontalLayout_4.setObjectName("horizontalLayout_4")
-        self.cmb_port = Combobox(self.horizontalWidget)
+        self.cmb_port = ComboBox(self.horizontalWidget)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(2)
         sizePolicy.setVerticalStretch(0)
@@ -274,4 +274,4 @@ class Ui_MainWindow(object):
         self.btn_autoupdate.setText(_translate("MainWindow", "一键自动更新"))
         self.btn_exit.setText(_translate("MainWindow", "退出串口更新"))
         self.label_2.setText(_translate("MainWindow", "更新进度："))
-from combobox import Combobox
+from combobox import ComboBox

@@ -97,7 +97,7 @@
               <number>2</number>
              </property>
              <item>
-              <widget class="Combobox" name="cmb_port">
+              <widget class="ComboBox" name="cmb_port">
                <property name="sizePolicy">
                 <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
                  <horstretch>2</horstretch>
@@ -499,7 +499,7 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>Combobox</class>
+   <class>ComboBox</class>
    <extends>QComboBox</extends>
    <header>combobox.h</header>
   </customwidget>
